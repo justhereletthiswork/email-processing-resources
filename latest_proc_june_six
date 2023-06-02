@@ -1,0 +1,244 @@
+// Simple E-mail Checking    
+// This code requires the Java mail library
+// smtp.jar, pop3.jar, mailapi.jar, imap.jar, activation.jar
+// Download:// http://java.sun.com/products/javamail/
+
+//UpDATED 5/30 11:51
+
+import processing.serial.*;
+import javax.mail.*;
+import javax.mail.internet.*;
+import java.util.Properties;
+import javax.mail.Flags;
+import javax.mail.Flags.Flag;
+import javax.mail.Folder;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.NoSuchProviderException;
+import javax.mail.Session;
+import javax.mail.Store;
+import javax.mail.search.FlagTerm;
+import processing.video.*;
+int flag = 0;
+Serial myPort;        // The serial port
+int inByte = 0;
+int signal;
+Capture cam;
+
+void setup() {
+  size(640, 480);
+
+  String[] cameras = Capture.list();
+
+  //if (cameras == null) {
+   // println("Failed to retrieve the list of available cameras, will try the default...");
+    //cam = new Capture(this, 640, 480);
+  //} else if (cameras.length == 0) {
+    //println("There are no cameras available for capture.");
+   // exit();
+  //} else {
+    //println("Available cameras:");
+    //printArray(cameras);
+    // The camera can be initialized directly using an element
+    // from the array returned by list():
+    //println (cameras[1]);
+    cam = new Capture(this, cameras[1]);
+    // Or, the settings can be defined based on the text in the list 
+  //}
+  //println(Serial.list());
+  //myPort = new Serial(this, Serial.list()[0], 9600);
+  // don't generate a serialEvent() unless you get a newline character:
+  //myPort.bufferUntil('\n');
+}
+
+void draw(){
+  if (inByte == 1){ 
+    println("e0");
+    cam.start();
+    println("e2");
+    delay(300);  
+    while (cam.available() == false) {    
+    }
+    cam.read();
+    println("e1");
+    set(0, 0, cam);
+    saveFrame("/Users/ceid/Pictures/CreatureCaptureCamera/photo.jpg");
+    flag = 1;
+    cam.stop();
+    sendMail();
+    println("email sent");
+    inByte = 0;
+    signal = 0;
+  }
+  //instruction
+  int k = 500;
+  String host = "imap.gmail.com";
+  String mailStoreType = "imap";;  
+  String username = "engineeringenas118@gmail.com";
+  String password = "enas118yale";
+  signal = check(host, mailStoreType, username, password);
+  if (signal == 1){
+    myPort.write('H');
+  }
+  else if (signal == 2){
+    cam.start();
+    delay(300);  
+    while (cam.available() == false) {    
+    }
+    cam.read();
+    set(0, 0, cam);
+    saveFrame("/Users/ceid/Pictures/CreatureCaptureCamera/photo.jpg");
+    flag = 1;
+    cam.stop();
+    sendMail();
+    println("email sent");
+    inByte = 0;
+    signal = 0;
+  }
+  else{
+    myPort.write('L');
+  }
+  //println(signal);
+  delay(k); 
+}
+
+void serialEvent (Serial myPort) {
+  println("something");
+  // get the ASCII string:
+  String inString = myPort.readStringUntil('\n');
+  if (inString != null) {
+  // trim off any whitespace:
+  inString = trim(inString);
+  // convert to an int and map to the screen height:
+  inByte = int(inString);
+  println(inByte);
+  }
+}
+
+// Simple Authenticator      
+// Careful, this is terribly unsecure!!
+
+import javax.mail.Authenticator;
+import javax.mail.PasswordAuthentication;
+
+public class Auth extends Authenticator {
+  public Auth() {
+    super();
+  }
+  public PasswordAuthentication getPasswordAuthentication() {
+    String username, password;
+    username ="engineeringenas118@gmail.com";
+    password = "enas118yale";
+    System.out.println("authenticating... ");
+    return new PasswordAuthentication(username, password);
+  }
+}
+
+// Example functions that send mail (smtp)
+// You can also do imap, but that's not included here
+
+// A function to check a mail account
+import java.util.*;
+//import java.io.*;
+import javax.activation.*;
+
+// A function to send mail
+void sendMail() {
+  // Create a session
+  String host="smtp.gmail.com";
+  Properties props=new Properties();
+
+  // SMTP Session
+  props.put("mail.transport.protocol", "smtp");
+  props.put("mail.smtp.host", host);
+  props.put("mail.smtp.port", "587");
+  props.put("mail.smtp.auth", "true");
+  // We need TTLS, which gmail requires
+  props.put("mail.smtp.starttls.enable","true");
+
+  // Create a session
+  Session session = Session.getInstance(props, new Auth());
+
+  try
+  {
+    MimeMessage msg=new MimeMessage(session);
+    msg.setFrom(new InternetAddress("engineeringenas118@gmail.com", "enas"));
+    msg.addRecipient(Message.RecipientType.TO,new InternetAddress("jason.nuttle@Fja.edu")); //email receiver here
+    msg.setSubject("picture taken");
+    BodyPart messageBodyPart = new MimeBodyPart();
+    messageBodyPart.setText("Email sent with Processing");
+    Multipart multipart = new MimeMultipart();
+    multipart.addBodyPart(messageBodyPart);
+   // Part two is attachment
+    messageBodyPart = new MimeBodyPart();
+    DataSource source = new FileDataSource("/Users/ceid/Pictures/CreatureCaptureCamera/photo.jpg"); //photo file location here
+    messageBodyPart.setDataHandler(new DataHandler(source));
+    messageBodyPart.setFileName("catch.jpg");
+    multipart.addBodyPart(messageBodyPart);
+    msg.setContent(multipart);
+    msg.setSentDate(new Date());
+    Transport.send(msg);
+    println("Mail sent!");
+  }
+  catch(Exception e)
+  {
+    e.printStackTrace();
+  }
+
+}
+
+int check(String host, String storeType, String user, String password) {
+  try {
+      // string for intrustion
+      String Instruct;
+      
+      // create properties
+      Properties properties = new Properties();
+
+      properties.put("mail.imap.host", host);
+      properties.put("mail.imap.port", "993");
+      properties.put("mail.imap.starttls.enable", "true");
+      properties.put("mail.imap.ssl.trust", host);
+
+      Session emailSession = Session.getInstance(properties);
+
+      // create the imap store object and connect to the imap server
+      Store store = emailSession.getStore("imaps");
+
+      store.connect(host, user, password);
+
+      // create the inbox object and open it
+      Folder inbox = store.getFolder("Inbox");
+      inbox.open(Folder.READ_WRITE);
+
+      // retrieve the messages from the folder in an array and print it
+      Message[] messages = inbox.search(new FlagTerm(new Flags(Flag.SEEN), false));
+      //System.out.println("messages.length---" + messages.length);
+
+      if (messages.length > 0) {
+        Message message = messages[messages.length - 1];
+        message.setFlag(Flag.SEEN, true);
+        Instruct = message.getSubject();
+        System.out.println("---------------------------------");
+        //System.out.println("Email Number " + (i + 1));
+        System.out.println("Instruction: " + Instruct);
+        System.out.println("From: " + message.getFrom()[0]);
+        if (Instruct.equals("release") == true){
+          return 1;
+        }
+        else if (Instruct.equals("picture") == true){
+          return 2;
+        }
+      }
+      inbox.close(false);
+      store.close();  
+
+    } catch (NoSuchProviderException e) {
+      e.printStackTrace();
+    } catch (MessagingException e) {
+      e.printStackTrace();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }   
+    return 0;   
+}
